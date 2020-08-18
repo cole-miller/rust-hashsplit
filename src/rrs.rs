@@ -10,11 +10,11 @@ pub struct Hasher {
     modulus: u32,
     offset: u32,
     style: Style,
-    width: usize,
+    width: u32,
 }
 
 impl Hasher {
-    pub fn new(modulus: u32, offset: u32, style: Style, width: usize) -> Self {
+    pub fn new(modulus: u32, offset: u32, style: Style, width: u32) -> Self {
         Self {
             modulus,
             offset,
@@ -29,7 +29,7 @@ impl crate::Hasher for Hasher {
     type State = State;
 
     fn width(&self) -> usize {
-        self.width
+        self.width as usize
     }
 
     fn empty_checksum() -> Checksum {
@@ -55,10 +55,10 @@ impl crate::Hasher for Hasher {
     }
 }
 
-pub fn rrs0(width: usize) -> Hasher {
+pub fn rrs0(width: u32) -> Hasher {
     Hasher::new(1 << 16, 31, Style::Rrs0, width)
 }
 
-pub fn rrs1(width: usize) -> Hasher {
+pub fn rrs1(width: u32) -> Hasher {
     Hasher::new(1 << 16, 31, Style::Rrs1, width)
 }
