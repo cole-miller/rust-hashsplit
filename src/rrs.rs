@@ -118,9 +118,5 @@ where
 }
 
 pub fn rrs1(width: usize) -> Hasher {
-    Hasher {
-        modulus: 1 << 16,
-        offset: 31,
-        width,
-    }
+    Hasher::new(1 << 16, 31, width)
 }
