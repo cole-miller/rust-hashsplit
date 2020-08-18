@@ -30,7 +30,7 @@ impl Hasher {
         let (a, b) = state;
         let a_new = (a - old_byte as u32 + new_byte as u32) % self.modulus;
         let b_new = (b - self.width as u32 * (old_byte as u32 + a_new)) % self.modulus;
-        let sum = a_new + (b_new << 16);
+        let sum = b_new + (a_new << 16);
 
         (sum, (a_new, b_new))
     }
