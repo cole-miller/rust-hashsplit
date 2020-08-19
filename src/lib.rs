@@ -97,9 +97,7 @@ where
         }
         let (sum, state) = hold;
 
-        if i < hasher.width() {
-            None
-        } else {
+        if i == hasher.width() {
             Some(Self {
                 hasher,
                 next: Some(sum),
@@ -108,6 +106,8 @@ where
                 ring,
                 bytes: it,
             })
+        } else {
+            None
         }
     }
 
