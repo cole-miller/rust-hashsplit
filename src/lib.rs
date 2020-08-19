@@ -12,11 +12,11 @@ pub trait Hasher {
         new_byte: u8,
     ) -> (Self::Checksum, Self::State);
 
-    fn process_chunk64(
+    fn process_slice(
         &self,
         state: Self::State,
-        old_data: &[u8; 8],
-        new_data: &[u8; 8],
+        old_data: &[u8],
+        new_data: &[u8],
     ) -> (Self::Checksum, Self::State) {
         old_data.iter().zip(new_data.iter()).fold(
             (Self::empty_checksum(), state),
@@ -24,6 +24,15 @@ pub trait Hasher {
                 self.process_byte(prev_state, *old_byte, *new_byte)
             },
         )
+    }
+
+    fn process_chunk64(
+        &self,
+        state: Self::State,
+        old_data: &[u8; 8],
+        new_data: &[u8; 8],
+    ) -> (Self::Checksum, Self::State) {
+        self.process_slice(state, old_data, new_data)
     }
 
     fn process_chunk128(
@@ -32,12 +41,7 @@ pub trait Hasher {
         old_data: &[u8; 16],
         new_data: &[u8; 16],
     ) -> (Self::Checksum, Self::State) {
-        old_data.iter().zip(new_data.iter()).fold(
-            (Self::empty_checksum(), state),
-            |(_, prev_state), (old_byte, new_byte)| {
-                self.process_byte(prev_state, *old_byte, *new_byte)
-            },
-        )
+        self.process_slice(state, old_data, new_data)
     }
 
     fn process_chunk256(
@@ -46,12 +50,7 @@ pub trait Hasher {
         old_data: &[u8; 32],
         new_data: &[u8; 32],
     ) -> (Self::Checksum, Self::State) {
-        old_data.iter().zip(new_data.iter()).fold(
-            (Self::empty_checksum(), state),
-            |(_, prev_state), (old_byte, new_byte)| {
-                self.process_byte(prev_state, *old_byte, *new_byte)
-            },
-        )
+        self.process_slice(state, old_data, new_data)
     }
 
     fn process_chunk512(
@@ -60,12 +59,7 @@ pub trait Hasher {
         old_data: &[u8; 64],
         new_data: &[u8; 64],
     ) -> (Self::Checksum, Self::State) {
-        old_data.iter().zip(new_data.iter()).fold(
-            (Self::empty_checksum(), state),
-            |(_, prev_state), (old_byte, new_byte)| {
-                self.process_byte(prev_state, *old_byte, *new_byte)
-            },
-        )
+        self.process_slice(state, old_data, new_data)
     }
 }
 
