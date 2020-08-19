@@ -26,7 +26,7 @@ pub trait Hasher {
         )
     }
 
-    fn process_chunk64(
+    unsafe fn process_chunk64(
         &self,
         state: Self::State,
         old_data: &[u8; 8],
@@ -35,7 +35,7 @@ pub trait Hasher {
         self.process_slice(state, old_data, new_data)
     }
 
-    fn process_chunk128(
+    unsafe fn process_chunk128(
         &self,
         state: Self::State,
         old_data: &[u8; 16],
@@ -44,7 +44,7 @@ pub trait Hasher {
         self.process_slice(state, old_data, new_data)
     }
 
-    fn process_chunk256(
+    unsafe fn process_chunk256(
         &self,
         state: Self::State,
         old_data: &[u8; 32],
@@ -53,7 +53,7 @@ pub trait Hasher {
         self.process_slice(state, old_data, new_data)
     }
 
-    fn process_chunk512(
+    unsafe fn process_chunk512(
         &self,
         state: Self::State,
         old_data: &[u8; 64],
