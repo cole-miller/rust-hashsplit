@@ -40,7 +40,7 @@ impl crate::Hasher for Hasher {
         (0, 0)
     }
 
-    fn process_byte(&self, state: &State, old_byte: u8, new_byte: u8) -> (Checksum, State) {
+    fn process_byte(&self, state: State, old_byte: u8, new_byte: u8) -> (Checksum, State) {
         let (a, b) = state;
         let a_new = (a - old_byte as u32 + new_byte as u32) % self.modulus;
         let b_new =

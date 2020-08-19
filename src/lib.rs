@@ -7,10 +7,66 @@ pub trait Hasher {
     fn initial_state() -> Self::State;
     fn process_byte(
         &self,
-        state: &Self::State,
+        state: Self::State,
         old_byte: u8,
         new_byte: u8,
     ) -> (Self::Checksum, Self::State);
+
+    fn process_chunk64(
+        &self,
+        state: Self::State,
+        old_data: &[u8; 8],
+        new_data: &[u8; 8],
+    ) -> (Self::Checksum, Self::State) {
+        old_data.iter().zip(new_data.iter()).fold(
+            (Self::empty_checksum(), state),
+            |(_, prev_state), (old_byte, new_byte)| {
+                self.process_byte(prev_state, *old_byte, *new_byte)
+            },
+        )
+    }
+
+    fn process_chunk128(
+        &self,
+        state: Self::State,
+        old_data: &[u8; 16],
+        new_data: &[u8; 16],
+    ) -> (Self::Checksum, Self::State) {
+        old_data.iter().zip(new_data.iter()).fold(
+            (Self::empty_checksum(), state),
+            |(_, prev_state), (old_byte, new_byte)| {
+                self.process_byte(prev_state, *old_byte, *new_byte)
+            },
+        )
+    }
+
+    fn process_chunk256(
+        &self,
+        state: Self::State,
+        old_data: &[u8; 32],
+        new_data: &[u8; 32],
+    ) -> (Self::Checksum, Self::State) {
+        old_data.iter().zip(new_data.iter()).fold(
+            (Self::empty_checksum(), state),
+            |(_, prev_state), (old_byte, new_byte)| {
+                self.process_byte(prev_state, *old_byte, *new_byte)
+            },
+        )
+    }
+
+    fn process_chunk512(
+        &self,
+        state: Self::State,
+        old_data: &[u8; 64],
+        new_data: &[u8; 64],
+    ) -> (Self::Checksum, Self::State) {
+        old_data.iter().zip(new_data.iter()).fold(
+            (Self::empty_checksum(), state),
+            |(_, prev_state), (old_byte, new_byte)| {
+                self.process_byte(prev_state, *old_byte, *new_byte)
+            },
+        )
+    }
 }
 
 pub struct Rolling<H, I>
@@ -41,7 +97,7 @@ where
             }
 
             let (_, state) = hold;
-            hold = hasher.process_byte(&state, 0, byte);
+            hold = hasher.process_byte(state, 0, byte);
             ring.push(byte);
             i += 1;
         }
@@ -62,9 +118,14 @@ where
     }
 
     fn feed(&mut self, byte: u8) -> H::Checksum {
+        // mild hack
+        let mut dummy = H::initial_state();
+        std::mem::swap(&mut dummy, &mut self.state);
+        let prev_state = dummy;
+
         let (sum, new_state) = self
             .hasher
-            .process_byte(&self.state, self.ring[self.begin], byte);
+            .process_byte(prev_state, self.ring[self.begin], byte);
         self.state = new_state;
         self.ring[self.begin] = byte;
         self.begin = (self.begin + 1) % self.hasher.width();
