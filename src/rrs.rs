@@ -134,6 +134,7 @@ impl crate::Hasher for Hasher {
     }
 }
 
+#[deprecated(note = "Use `rrs1` instead.")]
 pub fn rrs0(width: u32) -> Hasher {
     Hasher::new(1 << 16, 31, Style::Rrs0, width)
 }
