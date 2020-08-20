@@ -1,3 +1,11 @@
+#![no_implicit_prelude]
+
+extern crate core;
+extern crate std;
+
+use core::prelude::v1::*;
+use std::vec::Vec;
+
 pub trait Hasher {
     type Checksum;
     type State;
@@ -114,7 +122,7 @@ where
     fn feed(&mut self, byte: u8) -> H::Checksum {
         // mild hack
         let mut dummy = H::initial_state();
-        std::mem::swap(&mut dummy, &mut self.state);
+        core::mem::swap(&mut dummy, &mut self.state);
         let prev_state = dummy;
 
         let (sum, new_state) = self
@@ -142,7 +150,7 @@ where
             None
         };
 
-        std::mem::swap(&mut self.next, &mut new_next);
+        core::mem::swap(&mut self.next, &mut new_next);
         let old_next = new_next;
 
         old_next

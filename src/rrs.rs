@@ -1,3 +1,7 @@
+extern crate core;
+
+use core::prelude::v1::*;
+
 pub type Checksum = u32;
 pub type State = (u32, u32);
 
@@ -66,9 +70,9 @@ impl crate::Hasher for Hasher {
         new_data: &[u8; 16],
     ) -> (Checksum, State) {
         #[cfg(target_arch = "x86")]
-        use std::arch::x86::*;
+        use core::arch::x86::*;
         #[cfg(target_arch = "x86_64")]
-        use std::arch::x86_64::*;
+        use core::arch::x86_64::*;
 
         let (a_prev, _) = state;
 
