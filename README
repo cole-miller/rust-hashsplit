@@ -5,3 +5,8 @@ in Ian Denhardt's (GitHub user @zenhack's) hashsplit-spec repository:
 	https://github.com/zenhack/hashsplit-spec
 
 Like those specifications, this library is a work in progress.
+
+Development takes place on the `develop` branch, with `master` being
+occasionally fast-forwarded to reflect progress. Commits that are not part of
+the `master` history may be amended, retracted, etc., without warning. When the
+crate gets its first release we'll adopt a more disciplined workflow.
