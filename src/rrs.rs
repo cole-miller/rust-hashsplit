@@ -119,8 +119,8 @@ impl crate::Hasher for Hasher {
         //  ^ oo_oo_nn_nn_00_00_00_00
         let both_stacked = _mm_hadd_epi16(both_stacked, zeroed);
         //  ^ oo_nn_00_00_00_00_00_00
-        let b_new = (0u32 - 16u32 * self.width * self.offset - self.width * old_summed
-            + 16u32 * a_prev
+        let b_new = (0_u32 - 16_u32 * self.width * self.offset - self.width * old_summed
+            + 16_u32 * a_prev
             - _mm_extract_epi16(both_stacked, 0) as u32
             + _mm_extract_epi16(both_stacked, 1) as u32)
             % self.modulus;
