@@ -10,3 +10,8 @@ Development takes place on the `develop` branch, with `master` being
 occasionally fast-forwarded to reflect progress. Commits that are not part of
 the `master` history may be amended, retracted, etc., without warning. When the
 crate gets its first release we'll adopt a more disciplined workflow.
+
+This repository is hosted at:
+
+	https://github.com/cole-miller/rust-hashsplit
+	https://git.cole-miller.net/rust-hashsplit
