@@ -3,6 +3,8 @@
 extern crate core;
 extern crate std;
 
+use util::*;
+
 use core::prelude::v1::*;
 use std::vec::Vec;
 
@@ -11,8 +13,11 @@ pub trait Hasher {
     type State;
 
     fn width(&self) -> usize;
+
     fn empty_checksum() -> Self::Checksum;
+
     fn initial_state() -> Self::State;
+
     fn process_byte(
         &self,
         state: Self::State,
@@ -105,18 +110,14 @@ where
         }
         let (sum, state) = hold;
 
-        if i == hasher.width() {
-            Some(Self {
-                hasher,
-                next: Some(sum),
-                state,
-                begin: 0,
-                ring,
-                bytes: it,
-            })
-        } else {
-            None
-        }
+        (i == hasher.width()).and_some(Self {
+            hasher,
+            next: Some(sum),
+            state,
+            begin: 0,
+            ring,
+            bytes: it,
+        })
     }
 
     fn feed(&mut self, byte: u8) -> H::Checksum {
@@ -130,7 +131,10 @@ where
             .process_byte(prev_state, self.ring[self.begin], byte);
         self.state = new_state;
         self.ring[self.begin] = byte;
-        self.begin = (self.begin + 1) % self.hasher.width();
+        self.begin += 1;
+        if self.begin == self.hasher.width() {
+            self.begin = 0;
+        }
 
         sum
     }
@@ -144,16 +148,32 @@ where
     type Item = H::Checksum;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let mut new_next = if let Some(byte) = self.bytes.next() {
-            Some(self.feed(byte))
-        } else {
-            None
-        };
+        let mut new_next = self.bytes.next().map(|byte| self.feed(byte));
 
         core::mem::swap(&mut self.next, &mut new_next);
         let old_next = new_next;
 
         old_next
+    }
+}
+
+pub(crate) mod util {
+    extern crate core;
+
+    use core::prelude::v1::*;
+
+    pub trait Switch {
+        fn and_some<T>(&self, x: T) -> Option<T>;
+    }
+
+    impl Switch for bool {
+        fn and_some<T>(&self, x: T) -> Option<T> {
+            if *self {
+                Some(x)
+            } else {
+                None
+            }
+        }
     }
 }
 

@@ -10,6 +10,17 @@ pub enum Style {
     Rrs1,
 }
 
+impl Style {
+    fn checksum_from_state(&self, state: State) -> Checksum {
+        let (a, b) = state;
+
+        match self {
+            Self::Rrs0 => a + (b << 16),
+            Self::Rrs1 => b + (a << 16),
+        }
+    }
+}
+
 pub struct Hasher {
     modulus: u32,
     offset: u32,
@@ -49,13 +60,10 @@ impl crate::Hasher for Hasher {
         let a_new = (a - old_byte as u32 + new_byte as u32) % self.modulus;
         let b_new =
             (b - self.width as u32 * (old_byte as u32 + self.offset) + a_new) % self.modulus;
+        let new_state = (a_new, b_new);
+        let sum = self.style.checksum_from_state(new_state);
 
-        let sum = match self.style {
-            Style::Rrs0 => a_new + (b_new << 16),
-            Style::Rrs1 => b_new + (a_new << 16),
-        };
-
-        (sum, (a_new, b_new))
+        (sum, new_state)
     }
 
     #[cfg(all(
@@ -125,12 +133,10 @@ impl crate::Hasher for Hasher {
             + _mm_extract_epi16(both_stacked, 1) as u32)
             % self.modulus;
 
-        let sum = match self.style {
-            Style::Rrs0 => a_new + (b_new << 16),
-            Style::Rrs1 => b_new + (a_new << 16),
-        };
+        let new_state = (a_new, b_new);
+        let sum = self.style.checksum_from_state(new_state);
 
-        (sum, (a_new, b_new))
+        (sum, new_state)
     }
 }
 
@@ -142,3 +148,5 @@ pub fn rrs0(width: u32) -> Hasher {
 pub fn rrs1(width: u32) -> Hasher {
     Hasher::new(1 << 16, 31, Style::Rrs1, width)
 }
+
+pub type Rolling<I> = crate::Rolling<Hasher, I>;
