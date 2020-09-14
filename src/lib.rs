@@ -8,8 +8,37 @@ use util::*;
 use core::prelude::v1::*;
 use std::vec::Vec;
 
+pub trait TrailingZeros {
+    fn count_trailing_zeros(&self) -> u32;
+}
+
+macro_rules! implement_trailing_zeros_for_primitive {
+    ($t:ty) => {
+        impl $crate::TrailingZeros for $t {
+            fn count_trailing_zeros(&self) -> u32 {
+                self.trailing_zeros()
+            }
+        }
+    };
+}
+
+implement_trailing_zeros_for_primitive!{i8}
+implement_trailing_zeros_for_primitive!{i16}
+implement_trailing_zeros_for_primitive!{i32}
+implement_trailing_zeros_for_primitive!{i64}
+implement_trailing_zeros_for_primitive!{i128}
+implement_trailing_zeros_for_primitive!{isize}
+
+implement_trailing_zeros_for_primitive!{u8}
+implement_trailing_zeros_for_primitive!{u16}
+implement_trailing_zeros_for_primitive!{u32}
+implement_trailing_zeros_for_primitive!{u64}
+implement_trailing_zeros_for_primitive!{u128}
+implement_trailing_zeros_for_primitive!{usize}
+
 pub trait Hasher {
-    type Checksum;
+    type Checksum: TrailingZeros;
+
     type State;
 
     fn width(&self) -> usize;
