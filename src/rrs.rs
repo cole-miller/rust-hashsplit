@@ -37,18 +37,15 @@ impl Hasher {
 
 impl crate::Hasher for Hasher {
     type Checksum = Checksum;
+
     type State = State;
+
+    const EMPTY_CHECKSUM: Checksum = 0;
+
+    const INITIAL_STATE: State = (0, 0);
 
     fn width(&self) -> usize {
         self.width as usize
-    }
-
-    fn empty_checksum() -> Checksum {
-        0
-    }
-
-    fn initial_state() -> State {
-        (0, 0)
     }
 
     fn process_byte(&self, state: State, old_byte: u8, new_byte: u8) -> (Checksum, State) {

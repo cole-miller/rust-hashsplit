@@ -41,11 +41,11 @@ pub trait Hasher {
 
     type State;
 
+    const EMPTY_CHECKSUM: Self::Checksum;
+
+    const INITIAL_STATE: Self::State;
+
     fn width(&self) -> usize;
-
-    fn empty_checksum() -> Self::Checksum;
-
-    fn initial_state() -> Self::State;
 
     fn process_byte(
         &self,
@@ -61,7 +61,7 @@ pub trait Hasher {
         new_data: &[u8],
     ) -> (Self::Checksum, Self::State) {
         old_data.iter().zip(new_data.iter()).fold(
-            (Self::empty_checksum(), state),
+            (Self::EMPTY_CHECKSUM, state),
             |(_, prev_state), (old_byte, new_byte)| {
                 self.process_byte(prev_state, *old_byte, *new_byte)
             },
@@ -125,7 +125,7 @@ where
     I: Iterator<Item = u8>,
 {
     pub fn start(hasher: H, mut it: I) -> Option<Self> {
-        let mut hold = (H::empty_checksum(), H::initial_state());
+        let mut hold = (H::EMPTY_CHECKSUM, H::INITIAL_STATE);
         let mut i = 0;
         let mut ring = Vec::with_capacity(hasher.width());
 
@@ -153,7 +153,7 @@ where
 
     fn feed(&mut self, byte: u8) -> H::Checksum {
         // mild hack
-        let mut dummy = H::initial_state();
+        let mut dummy = H::INITIAL_STATE;
         core::mem::swap(&mut dummy, &mut self.state);
         let prev_state = dummy;
 
