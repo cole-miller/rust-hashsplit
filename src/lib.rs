@@ -1,11 +1,11 @@
-#![no_implicit_prelude]
+#![no_std]
 
-extern crate core;
+#[cfg(feature = "std")]
 extern crate std;
 
 use util::*;
 
-use core::prelude::v1::*;
+#[cfg(feature = "std")]
 use std::vec::Vec;
 
 pub trait TrailingZeros {
@@ -105,6 +105,7 @@ pub trait Hasher {
     }
 }
 
+#[cfg(feature = "std")]
 pub struct Rolling<H, I>
 where
     H: Hasher,
@@ -117,6 +118,7 @@ where
     bytes: I,
 }
 
+#[cfg(feature = "std")]
 impl<H, I> Rolling<H, I>
 where
     H: Hasher,
@@ -169,6 +171,7 @@ where
     }
 }
 
+#[cfg(feature = "std")]
 impl<H, I> Iterator for Rolling<H, I>
 where
     H: Hasher,
@@ -187,10 +190,6 @@ where
 }
 
 pub(crate) mod util {
-    extern crate core;
-
-    use core::prelude::v1::*;
-
     pub trait Switch {
         fn and_some<T>(&self, x: T) -> Option<T>;
     }

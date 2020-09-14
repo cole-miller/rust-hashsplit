@@ -1,7 +1,3 @@
-extern crate core;
-
-use core::prelude::v1::*;
-
 pub type Checksum = u32;
 pub type State = (u32, u32);
 
@@ -149,4 +145,5 @@ pub fn rrs1(width: u32) -> Hasher {
     Hasher::new(1 << 16, 31, Style::Rrs1, width)
 }
 
+#[cfg(feature = "std")]
 pub type Rolling<I> = crate::Rolling<Hasher, I>;
