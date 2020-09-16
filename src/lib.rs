@@ -5,6 +5,8 @@ extern crate std;
 
 use util::*;
 
+use core::borrow::Borrow;
+
 #[cfg(feature = "std")]
 use std::vec::Vec;
 
@@ -22,19 +24,19 @@ macro_rules! implement_trailing_zeros_for_primitive {
     };
 }
 
-implement_trailing_zeros_for_primitive!{i8}
-implement_trailing_zeros_for_primitive!{i16}
-implement_trailing_zeros_for_primitive!{i32}
-implement_trailing_zeros_for_primitive!{i64}
-implement_trailing_zeros_for_primitive!{i128}
-implement_trailing_zeros_for_primitive!{isize}
+implement_trailing_zeros_for_primitive! {i8}
+implement_trailing_zeros_for_primitive! {i16}
+implement_trailing_zeros_for_primitive! {i32}
+implement_trailing_zeros_for_primitive! {i64}
+implement_trailing_zeros_for_primitive! {i128}
+implement_trailing_zeros_for_primitive! {isize}
 
-implement_trailing_zeros_for_primitive!{u8}
-implement_trailing_zeros_for_primitive!{u16}
-implement_trailing_zeros_for_primitive!{u32}
-implement_trailing_zeros_for_primitive!{u64}
-implement_trailing_zeros_for_primitive!{u128}
-implement_trailing_zeros_for_primitive!{usize}
+implement_trailing_zeros_for_primitive! {u8}
+implement_trailing_zeros_for_primitive! {u16}
+implement_trailing_zeros_for_primitive! {u32}
+implement_trailing_zeros_for_primitive! {u64}
+implement_trailing_zeros_for_primitive! {u128}
+implement_trailing_zeros_for_primitive! {usize}
 
 pub trait Hasher {
     type Checksum: TrailingZeros;
@@ -119,17 +121,20 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<H, I> Rolling<H, I>
+impl<H, I, X> Rolling<H, I>
 where
     H: Hasher,
-    I: Iterator<Item = u8>,
+    I: Iterator<Item = X>,
+    X: Borrow<u8>,
 {
     pub fn start(hasher: H, mut it: I) -> Option<Self> {
         let mut hold = (H::EMPTY_CHECKSUM, H::INITIAL_STATE);
         let mut i = 0;
         let mut ring = Vec::with_capacity(hasher.width());
 
-        while let Some(byte) = it.next() {
+        while let Some(p) = it.next() {
+            let byte = *p.borrow();
+
             if i == hasher.width() {
                 break;
             }
@@ -172,16 +177,16 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<H, I> Iterator for Rolling<H, I>
+impl<H, I, X> Iterator for Rolling<H, I>
 where
     H: Hasher,
-    I: Iterator<Item = u8>,
+    I: Iterator<Item = X>,
+    X: Borrow<u8>,
 {
     type Item = H::Checksum;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let mut new_next = self.bytes.next().map(|byte| self.feed(byte));
-
+        let mut new_next = self.bytes.next().map(|p| self.feed(*p.borrow()));
         core::mem::swap(&mut self.next, &mut new_next);
         let old_next = new_next;
 
