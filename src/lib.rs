@@ -5,6 +5,7 @@ extern crate std;
 
 use util::*;
 
+use arrayref::array_refs;
 use core::borrow::Borrow;
 
 #[cfg(feature = "std")]
@@ -85,7 +86,12 @@ pub trait Hasher {
         old_data: &[u8; 16],
         new_data: &[u8; 16],
     ) -> (Self::Checksum, Self::State) {
-        self.process_slice(state, old_data, new_data)
+        let (old_front, old_back) = array_refs![old_data, 8, 8];
+        let (new_front, new_back) = array_refs![new_data, 8, 8];
+
+        let (_, new_state) = self.process_chunk64(state, old_front, new_front);
+
+        self.process_chunk64(new_state, old_back, new_back)
     }
 
     unsafe fn process_chunk256(
@@ -94,7 +100,12 @@ pub trait Hasher {
         old_data: &[u8; 32],
         new_data: &[u8; 32],
     ) -> (Self::Checksum, Self::State) {
-        self.process_slice(state, old_data, new_data)
+        let (old_front, old_back) = array_refs![old_data, 16, 16];
+        let (new_front, new_back) = array_refs![new_data, 16, 16];
+
+        let (_, new_state) = self.process_chunk128(state, old_front, new_front);
+
+        self.process_chunk128(new_state, old_back, new_back)
     }
 
     unsafe fn process_chunk512(
@@ -103,7 +114,12 @@ pub trait Hasher {
         old_data: &[u8; 64],
         new_data: &[u8; 64],
     ) -> (Self::Checksum, Self::State) {
-        self.process_slice(state, old_data, new_data)
+        let (old_front, old_back) = array_refs![old_data, 32, 32];
+        let (new_front, new_back) = array_refs![new_data, 32, 32];
+
+        let (_, new_state) = self.process_chunk256(state, old_front, new_front);
+
+        self.process_chunk256(new_state, old_back, new_back)
     }
 }
 
