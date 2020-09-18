@@ -5,8 +5,7 @@ extern crate std;
 
 use util::*;
 
-use arrayref::array_refs;
-use core::borrow::Borrow;
+use core::num::NonZeroUsize;
 
 #[cfg(feature = "std")]
 use std::vec::Vec;
@@ -48,7 +47,7 @@ pub trait Hasher {
 
     const INITIAL_STATE: Self::State;
 
-    fn width(&self) -> usize;
+    fn width(&self) -> NonZeroUsize;
 
     fn process_byte(
         &self,
@@ -70,56 +69,19 @@ pub trait Hasher {
             },
         )
     }
+}
 
-    unsafe fn process_chunk64(
+pub trait Grain<Block>: Hasher
+where
+    Block: AsRef<[u8]>,
+{
+    fn process_block(
         &self,
         state: Self::State,
-        old_data: &[u8; 8],
-        new_data: &[u8; 8],
+        old_data: &Block,
+        new_data: &Block,
     ) -> (Self::Checksum, Self::State) {
-        self.process_slice(state, old_data, new_data)
-    }
-
-    unsafe fn process_chunk128(
-        &self,
-        state: Self::State,
-        old_data: &[u8; 16],
-        new_data: &[u8; 16],
-    ) -> (Self::Checksum, Self::State) {
-        let (old_front, old_back) = array_refs![old_data, 8, 8];
-        let (new_front, new_back) = array_refs![new_data, 8, 8];
-
-        let (_, new_state) = self.process_chunk64(state, old_front, new_front);
-
-        self.process_chunk64(new_state, old_back, new_back)
-    }
-
-    unsafe fn process_chunk256(
-        &self,
-        state: Self::State,
-        old_data: &[u8; 32],
-        new_data: &[u8; 32],
-    ) -> (Self::Checksum, Self::State) {
-        let (old_front, old_back) = array_refs![old_data, 16, 16];
-        let (new_front, new_back) = array_refs![new_data, 16, 16];
-
-        let (_, new_state) = self.process_chunk128(state, old_front, new_front);
-
-        self.process_chunk128(new_state, old_back, new_back)
-    }
-
-    unsafe fn process_chunk512(
-        &self,
-        state: Self::State,
-        old_data: &[u8; 64],
-        new_data: &[u8; 64],
-    ) -> (Self::Checksum, Self::State) {
-        let (old_front, old_back) = array_refs![old_data, 32, 32];
-        let (new_front, new_back) = array_refs![new_data, 32, 32];
-
-        let (_, new_state) = self.process_chunk256(state, old_front, new_front);
-
-        self.process_chunk256(new_state, old_back, new_back)
+        self.process_slice(state, old_data.as_ref(), new_data.as_ref())
     }
 }
 
@@ -129,7 +91,6 @@ where
     H: Hasher,
 {
     hasher: H,
-    next: Option<H::Checksum>,
     state: H::State,
     begin: usize,
     ring: Vec<u8>,
@@ -137,35 +98,25 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<H, I, X> Rolling<H, I>
+impl<H, I> Rolling<H, I>
 where
     H: Hasher,
-    I: Iterator<Item = X>,
-    X: Borrow<u8>,
+    I: Iterator<Item = u8>,
 {
-    pub fn start(hasher: H, mut it: I) -> Option<Self> {
-        let mut hold = (H::EMPTY_CHECKSUM, H::INITIAL_STATE);
-        let mut i = 0;
-        let mut ring = Vec::with_capacity(hasher.width());
+    pub fn try_start(hasher: H, mut it: I) -> Option<Self> {
+        let width = hasher.width().get();
+        let mut ring = Vec::with_capacity(width);
 
-        while let Some(p) = it.next() {
-            let byte = *p.borrow();
-
-            if i == hasher.width() {
+        for byte in &mut it {
+            ring.push(byte);
+            if ring.len() == width {
                 break;
             }
-
-            let (_, state) = hold;
-            hold = hasher.process_byte(state, 0, byte);
-            ring.push(byte);
-            i += 1;
         }
-        let (sum, state) = hold;
 
-        (i == hasher.width()).and_some(Self {
+        (ring.len() == width).and_some(Self {
             hasher,
-            next: Some(sum),
-            state,
+            state: H::INITIAL_STATE,
             begin: 0,
             ring,
             bytes: it,
@@ -173,7 +124,6 @@ where
     }
 
     fn feed(&mut self, byte: u8) -> H::Checksum {
-        // mild hack
         let mut dummy = H::INITIAL_STATE;
         core::mem::swap(&mut dummy, &mut self.state);
         let prev_state = dummy;
@@ -184,7 +134,7 @@ where
         self.state = new_state;
         self.ring[self.begin] = byte;
         self.begin += 1;
-        if self.begin == self.hasher.width() {
+        if self.begin == self.hasher.width().get() {
             self.begin = 0;
         }
 
@@ -193,32 +143,67 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<H, I, X> Iterator for Rolling<H, I>
+impl<H, I> Iterator for Rolling<H, I>
 where
     H: Hasher,
-    I: Iterator<Item = X>,
-    X: Borrow<u8>,
+    I: Iterator<Item = u8>,
 {
     type Item = H::Checksum;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let mut new_next = self.bytes.next().map(|p| self.feed(*p.borrow()));
-        core::mem::swap(&mut self.next, &mut new_next);
-        let old_next = new_next;
+        self.bytes.next().map(|byte| self.feed(byte))
+    }
+}
 
-        old_next
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    struct TrivialHasher;
+
+    impl Hasher for TrivialHasher {
+        type Checksum = u8;
+
+        type State = ();
+
+        const EMPTY_CHECKSUM: Self::Checksum = 0;
+
+        const INITIAL_STATE: Self::State = ();
+
+        fn width(&self) -> NonZeroUsize {
+            NonZeroUsize::new(1).unwrap()
+        }
+
+        fn process_byte(
+            &self,
+            _state: Self::State,
+            _old_byte: u8,
+            new_byte: u8,
+        ) -> (Self::Checksum, Self::State) {
+            (new_byte, ())
+        }
     }
 }
 
 pub(crate) mod util {
-    pub trait Switch {
+    pub trait SwitchOption {
         fn and_some<T>(&self, x: T) -> Option<T>;
+
+        fn and_then_some<T, F: FnOnce() -> T>(&self, f: F) -> Option<T>;
     }
 
-    impl Switch for bool {
+    impl SwitchOption for bool {
         fn and_some<T>(&self, x: T) -> Option<T> {
             if *self {
                 Some(x)
+            } else {
+                None
+            }
+        }
+
+        fn and_then_some<T, F: FnOnce() -> T>(&self, f: F) -> Option<T> {
+            if *self {
+                Some(f())
             } else {
                 None
             }
