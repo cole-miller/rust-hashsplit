@@ -10,36 +10,36 @@ use core::num::NonZeroUsize;
 #[cfg(feature = "std")]
 use std::vec::Vec;
 
-pub trait TrailingZeros {
-    fn count_trailing_zeros(&self) -> u32;
+pub trait Leveled {
+    fn level(&self) -> u32;
 }
 
-macro_rules! implement_trailing_zeros_for_primitive {
+macro_rules! implement_leveled_for_primitive {
     ($t:ty) => {
-        impl $crate::TrailingZeros for $t {
-            fn count_trailing_zeros(&self) -> u32 {
+        impl $crate::Leveled for $t {
+            fn level(&self) -> u32 {
                 self.trailing_zeros()
             }
         }
     };
 }
 
-implement_trailing_zeros_for_primitive! {i8}
-implement_trailing_zeros_for_primitive! {i16}
-implement_trailing_zeros_for_primitive! {i32}
-implement_trailing_zeros_for_primitive! {i64}
-implement_trailing_zeros_for_primitive! {i128}
-implement_trailing_zeros_for_primitive! {isize}
+implement_leveled_for_primitive! {i8}
+implement_leveled_for_primitive! {i16}
+implement_leveled_for_primitive! {i32}
+implement_leveled_for_primitive! {i64}
+implement_leveled_for_primitive! {i128}
+implement_leveled_for_primitive! {isize}
 
-implement_trailing_zeros_for_primitive! {u8}
-implement_trailing_zeros_for_primitive! {u16}
-implement_trailing_zeros_for_primitive! {u32}
-implement_trailing_zeros_for_primitive! {u64}
-implement_trailing_zeros_for_primitive! {u128}
-implement_trailing_zeros_for_primitive! {usize}
+implement_leveled_for_primitive! {u8}
+implement_leveled_for_primitive! {u16}
+implement_leveled_for_primitive! {u32}
+implement_leveled_for_primitive! {u64}
+implement_leveled_for_primitive! {u128}
+implement_leveled_for_primitive! {usize}
 
 pub trait Hasher {
-    type Checksum: TrailingZeros;
+    type Checksum: Leveled;
 
     type State;
 
