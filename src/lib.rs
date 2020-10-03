@@ -11,8 +11,6 @@ called "chunks" — based on their associated checksum values. Hashsplitting bec
 combination with incremental hashing, since a change in the sequence of items will not require
 re-splitting the whole sequence, but only the neighborhood given by our rolling hash function. This
 is in contrast to splitting the sequence after every `N`th item, for example.
-
-
 */
 
 #![no_std]
