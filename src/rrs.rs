@@ -2,6 +2,8 @@
 The RRS family of hash functions, used by rsync and others.
 */
 
+use crate::Hasher;
+
 use core::num::NonZeroUsize;
 
 pub type Checksum = u32;
@@ -13,7 +15,7 @@ pub type State = (u32, u32);
 #[derive(Default)]
 pub struct Rrs<const MODULUS: u32, const OFFSET: u32>;
 
-impl<const MODULUS: u32, const OFFSET: u32> crate::Hasher for Rrs<MODULUS, OFFSET> {
+impl<const MODULUS: u32, const OFFSET: u32> Hasher for Rrs<MODULUS, OFFSET> {
     type Checksum = Checksum;
 
     type State = State;
