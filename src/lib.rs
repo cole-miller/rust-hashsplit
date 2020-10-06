@@ -22,10 +22,13 @@ extern crate alloc;
 use crate::util::*;
 
 use core::num::NonZeroUsize;
-use core::ops::Range;
+use core::ops::{Deref, Range};
 
 #[cfg(feature = "alloc")]
 use alloc::{boxed::Box, vec::Vec};
+
+#[cfg(feature = "immutable-vector")]
+use im_rc as im;
 
 /// Describes the required behavior for values of a hash function that's used for splitting.
 pub trait Leveled {
@@ -109,8 +112,6 @@ pub trait Hasher {
     }
 }
 
-/// An iterator adapter that pairs each byte in a sequence with the corresponding value of a chosen
-/// rolling hash function.
 #[cfg(feature = "alloc")]
 pub struct Rolling<Hash, Source>
 where
@@ -131,15 +132,7 @@ where
     Hash: Hasher,
     Source: Iterator<Item = u8>,
 {
-    /// Constructs a `Rolling` from a given hash function, starting buffer, and input iterator.
-    ///
-    /// Returns `None` if `buf` converts to an empty slice.
-    pub fn with_buf<Buf>(hasher: Hash, buf: Buf, source: Source) -> Option<Self>
-    where
-        Buf: Into<Box<[u8]>>,
-    {
-        let buf = buf.into();
-
+    pub fn with_buf(hasher: Hash, buf: Box<[u8]>, source: Source) -> Option<Self> {
         Some(Self {
             hasher,
             state: Hash::INITIAL_STATE,
@@ -150,21 +143,13 @@ where
         })
     }
 
-    /// Constructs a `Rolling` from a given starting buffer and input iterator, using an implicit
-    /// default hash function. This is suitable for hasher types that have a trivial run-time
-    /// representation.
-    ///
-    /// Returns `None` if `buf` converts to an empty slice.
-    pub fn default_with_buf<Buf>(buf: Buf, source: Source) -> Option<Self>
+    pub fn default_with_buf(buf: Box<[u8]>, source: Source) -> Option<Self>
     where
-        Buf: Into<Box<[u8]>>,
         Hash: Default,
     {
         Self::with_buf(Default::default(), buf, source)
     }
 
-    /// Constructs a `Rolling` from a given hash function, buffer width, and input iterator, using
-    /// a buffer initialized to all zeros.
     pub fn with_zeros(hasher: Hash, width: NonZeroUsize, source: Source) -> Self {
         Self {
             hasher,
@@ -176,8 +161,6 @@ where
         }
     }
 
-    /// Constructs a `Rolling` from a given buffer width and input iterator, using an implicit
-    /// default hash function and a buffer initialized to all zeros.
     pub fn default_with_zeros(width: NonZeroUsize, source: Source) -> Self
     where
         Hash: Default,
@@ -200,13 +183,6 @@ where
 
         sum
     }
-
-    pub fn delimited(self, threshold: u32) -> Delimited<Self>
-    where
-        Hash::Checksum: Leveled,
-    {
-        Delimited::start(threshold, self)
-    }
 }
 
 #[cfg(feature = "alloc")]
@@ -222,234 +198,173 @@ where
     }
 }
 
-/// A value that is either a piece of data or a boundary (with associated significance level)
-/// between runs of data in a sequence.
-pub enum Event<T> {
-    Data(T),
-    Boundary(u32),
+pub enum Event<Hash: Hasher> {
+    Data(u8),
+    Boundary(u32, Hash::State),
+    Eof(Hash::State),
 }
 
-/// An iterator adapter that transforms a sequence of data/checksum pairs into a sequence of data
-/// interspersed with boundary markers where the checksum value achieves a given "significance
-/// level".
-///
-/// The `Iterator` implementation for this type guarantees that an `Event::Boundary` can only be
-/// yielded immediately after an `Event::Data`.
-pub struct Delimited<Source> {
+#[cfg(feature = "alloc")]
+pub struct Delimited<Hash: Hasher, Source> {
     threshold: u32,
-    prepared: Option<u32>,
-    /// The input iterator.
-    pub source: Source,
+    prepared: Option<(u32, Hash::State)>,
+    halt: bool,
+    pub rolling: Rolling<Hash, Source>,
 }
 
-impl<Source, T, U> Delimited<Source>
+#[cfg(feature = "alloc")]
+impl<Hash, Source> Iterator for Delimited<Hash, Source>
 where
-    Source: Iterator<Item = (T, U)>,
-    U: Leveled,
+    Hash: Hasher,
+    Hash::Checksum: Leveled,
+    Hash::State: Clone,
+    Source: Iterator<Item = u8>,
 {
-    /// Construct a `Delimited` from a threshold significance level and an input iterator.
-    pub fn start(threshold: u32, source: Source) -> Self {
-        Self {
-            threshold,
-            prepared: None,
-            source,
-        }
-    }
-
-    #[cfg(feature = "alloc")]
-    pub fn splits(self, reserve: usize) -> Splits<Self> {
-        Splits::start(reserve, self)
-    }
-
-    pub fn spans(self) -> Spans<Self> {
-        Spans::start(self)
-    }
-}
-
-impl<Source, T, U> Iterator for Delimited<Source>
-where
-    Source: Iterator<Item = (T, U)>,
-    U: Leveled,
-{
-    type Item = Event<T>;
+    type Item = Event<Hash>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(lev) = self.prepared.take() {
-            return Some(Event::Boundary(lev));
+        if let Some((lev, state)) = self.prepared.take() {
+            return Some(Event::Boundary(lev, state));
         }
 
-        self.source.next().map(|(dat, sum)| {
+        if let Some((byte, sum)) = self.rolling.next() {
             let lev = sum.level();
-
             if lev >= self.threshold {
-                self.prepared = Some(lev);
+                self.prepared = Some((lev, self.rolling.state.clone()));
             }
 
-            Event::Data(dat)
-        })
+            return Some(Event::Data(byte));
+        }
+
+        if !self.halt {
+            self.halt = true;
+
+            return Some(Event::Eof(self.rolling.state.clone()));
+        }
+
+        None
     }
 }
 
-#[doc(hidden)]
-pub trait SomeEvent {
-    type Param;
-}
-
-impl<T> SomeEvent for Event<T> {
-    type Param = T;
-}
-
-/// An iterator adapter that transforms a sequence of data interspersed with boundaries into a
-/// sequence of owned slices that collect the runs of data between successive boundaries.
-///
-/// The `SomeEvent` constraint on `Source::Item` allows extracting the type parameter `T` from the
-/// generic type `Event<T>`, without introducing a superfluous type parameter on this struct.
-/// Although `SomeEvent` is `pub`, as required to write this constraint, it should not be used
-/// outside this module, and is marked `#[doc(hidden)]` to emphasize this. All that's guaranteed is
-/// that `Event<T>` implements `SomeEvent` for every (sized) `T`.
 #[cfg(feature = "alloc")]
-pub struct Splits<Source>
-where
-    Source: Iterator,
-    Source::Item: SomeEvent,
-{
+pub enum LiveBytes<'a> {
+    Borrowing(&'a [u8]),
+    Owning(Box<[u8]>),
+}
+
+#[cfg(feature = "alloc")]
+impl<'a> Deref for LiveBytes<'a> {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::Borrowing(x) => x,
+            Self::Owning(ref x) => x,
+        }
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<'a> AsRef<[u8]> for LiveBytes<'a> {
+    fn as_ref(&self) -> &[u8] {
+        self
+    }
+}
+
+#[cfg(feature = "alloc")]
+pub struct ResumableChunk<'a, Hash: Hasher> {
+    chunk: LiveBytes<'a>,
+    state: Hash::State,
+}
+
+#[cfg(feature = "alloc")]
+pub struct Splits<Source> {
     reserve: usize,
-    // hack to avoid declaring a second type parameter
-    preparing: Option<Vec<<<Source as Iterator>::Item as SomeEvent>::Param>>,
-    halt: bool,
-    /// The input iterator.
+    preparing: Option<Vec<u8>>,
     pub source: Source,
 }
 
 #[cfg(feature = "alloc")]
-impl<Source, T> Splits<Source>
-where
-    // note no `SomeEvent` here
-    Source: Iterator<Item = Event<T>>,
-{
-    pub fn start(reserve: usize, source: Source) -> Self {
-        Self {
-            reserve,
-            preparing: None,
-            halt: false,
-            source,
-        }
-    }
-
-    fn yield_prepared(&mut self) -> Option<Box<[T]>> {
+impl<Source> Splits<Source> {
+    fn yield_prepared(&mut self) -> Option<Box<[u8]>> {
         self.preparing.take().map(Vec::into_boxed_slice)
     }
 }
 
 #[cfg(feature = "alloc")]
-impl<Source, T> Iterator for Splits<Source>
+impl<Hash, Source> Iterator for Splits<Source>
 where
-    Source: Iterator<Item = Event<T>>,
+    Hash: Hasher,
+    Source: Iterator<Item = Event<Hash>>,
 {
-    type Item = Box<[T]>;
+    type Item = ResumableChunk<'static, Hash>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.halt {
-            return None;
-        }
-
         while let Some(ev) = self.source.next() {
             match ev {
-                Event::Data(dat) => {
+                Event::Data(byte) => {
                     let reserve = self.reserve;
-
                     self.preparing
-                        // lazy insertion to avoid allocating every time
                         .get_or_insert_with(|| Vec::with_capacity(reserve))
-                        .push(dat);
+                        .push(byte)
                 }
-                Event::Boundary(_) => {
-                    return self.yield_prepared();
+                Event::Boundary(_, state) => {
+                    return self.yield_prepared().map(|prep| ResumableChunk {
+                        chunk: LiveBytes::Owning(prep),
+                        state,
+                    });
+                }
+                Event::Eof(state) => {
+                    return self.yield_prepared().map(|prep| ResumableChunk {
+                        chunk: LiveBytes::Owning(prep),
+                        state,
+                    });
                 }
             }
         }
 
-        self.halt = true;
-        self.yield_prepared()
+        None
     }
 }
 
-/// An iterator adapter that transforms a sequence of data interspersed with boundaries into a
-/// sequence of index ranges that describe the runs of data between successive boundaries.
 pub struct Spans<Source> {
-    next_ix: usize,
     base_ix: usize,
-    halt: bool,
-    /// The input iterator.
-    pub source: Source,
+    next_ix: usize,
+    source: Source,
 }
 
 impl<Source> Spans<Source> {
-    pub fn start(source: Source) -> Self {
-        Self {
-            next_ix: 0,
-            base_ix: 0,
-            halt: false,
-            source,
+    fn yield_prepared(&mut self) -> Option<Range<usize>> {
+        if self.next_ix > self.base_ix {
+            let saved_ix = self.base_ix;
+            self.base_ix = self.next_ix;
+
+            Some(saved_ix..self.next_ix)
+        } else {
+            None
         }
     }
 }
 
-impl<Source, T> Iterator for Spans<Source>
+impl<Hash, Source> Iterator for Spans<Source>
 where
-    Source: Iterator<Item = Event<T>>,
+    Hash: Hasher,
+    Source: Iterator<Item = Event<Hash>>,
 {
-    type Item = Range<usize>;
+    type Item = (Range<usize>, Hash::State);
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.halt {
-            return None;
-        }
-
         while let Some(ev) = self.source.next() {
             match ev {
-                Event::Data(_) => {
-                    self.next_ix += 1;
+                Event::Data(_) => self.next_ix += 1,
+                Event::Boundary(_, state) => {
+                    return self.yield_prepared().map(|prep| (prep, state))
                 }
-                Event::Boundary(_) => {
-                    let saved_ix = core::mem::replace(&mut self.base_ix, self.next_ix);
-
-                    return Some(saved_ix..self.next_ix);
-                }
+                Event::Eof(state) => return self.yield_prepared().map(|prep| (prep, state)),
             }
         }
 
-        self.halt = true;
-        (self.next_ix > self.base_ix).check().and_then(|_| {
-            let saved_ix = core::mem::replace(&mut self.base_ix, self.next_ix);
-
-            Some(saved_ix..self.next_ix)
-        })
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    struct TrivialHasher;
-
-    impl Hasher for TrivialHasher {
-        type Checksum = u8;
-
-        type State = ();
-
-        const INITIAL_STATE: Self::State = ();
-
-        fn process_byte(
-            &self,
-            _state: Self::State,
-            _width: NonZeroUsize,
-            _old_byte: u8,
-            new_byte: u8,
-        ) -> (Self::Checksum, Self::State) {
-            (new_byte, ())
-        }
+        None
     }
 }
 
@@ -469,5 +384,7 @@ pub(crate) mod util {
     }
 }
 
-pub mod thinned;
 pub mod rrs;
+pub mod thin;
+#[cfg(feature = "alloc")]
+pub mod tree;
