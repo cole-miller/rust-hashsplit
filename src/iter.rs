@@ -1,63 +1,10 @@
 use crate::util::*;
 use crate::ResumableChunk;
-use crate::{Event, Hasher, Leveled, WINDOW_SIZE};
+use crate::{Event, Hasher, Leveled, Rolling};
 
-use alloc::{borrow::Cow, boxed::Box, vec::Vec};
+use alloc::{borrow::Cow, vec::Vec};
 
 use either::Either;
-
-pub struct Rolling<Hash: Hasher, Source> {
-    hasher: Hash,
-    state: Hash::State,
-    begin: usize,
-    ring: Box<[u8]>,
-    /// The input iterator.
-    pub source: Source,
-}
-
-impl<Hash, Source> Rolling<Hash, Source>
-where
-    Hash: Hasher,
-    Source: Iterator<Item = u8>,
-{
-    pub fn start(hasher: Hash, source: Source) -> Self {
-        Self {
-            hasher,
-            state: Hash::INITIAL_STATE,
-            begin: 0,
-            ring: alloc::vec![0; WINDOW_SIZE].into_boxed_slice(),
-            source,
-        }
-    }
-
-    fn feed(&mut self, byte: u8) -> Hash::Checksum {
-        let prev_state = core::mem::replace(&mut self.state, Hash::INITIAL_STATE);
-
-        let (sum, new_state) = self
-            .hasher
-            .process_byte(prev_state, self.ring[self.begin], byte);
-        self.state = new_state;
-        self.ring[self.begin] = byte;
-        self.begin += 1;
-        if self.begin == WINDOW_SIZE {
-            self.begin = 0;
-        }
-
-        sum
-    }
-}
-
-impl<Hash, Source> Iterator for Rolling<Hash, Source>
-where
-    Hash: Hasher,
-    Source: Iterator<Item = u8>,
-{
-    type Item = (u8, Hash::Checksum);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.source.next().map(|byte| (byte, self.feed(byte)))
-    }
-}
 
 pub struct Delimited<
     Hash: Hasher,
