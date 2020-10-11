@@ -2,9 +2,7 @@
 The RRS family of hash functions, used by rsync and others.
 */
 
-use crate::Hasher;
-
-use core::num::NonZeroUsize;
+use crate::{Hasher, Named, WINDOW_SIZE};
 
 pub type Checksum = u32;
 
@@ -22,14 +20,8 @@ impl<const MODULUS: u32, const OFFSET: u32> Hasher for Rrs<MODULUS, OFFSET> {
 
     const INITIAL_STATE: State = (0, 0);
 
-    fn process_byte(
-        &self,
-        state: State,
-        width: NonZeroUsize,
-        old_byte: u8,
-        new_byte: u8,
-    ) -> (Checksum, State) {
-        process_byte_freestanding::<MODULUS, OFFSET>(state, width, old_byte, new_byte)
+    fn process_byte(&self, state: State, old_byte: u8, new_byte: u8) -> (Checksum, State) {
+        process_byte_freestanding::<MODULUS, OFFSET>(state, old_byte, new_byte)
     }
 }
 
@@ -37,15 +29,12 @@ impl<const MODULUS: u32, const OFFSET: u32> Hasher for Rrs<MODULUS, OFFSET> {
 /// used as a `const` function.
 pub const fn process_byte_freestanding<const MODULUS: u32, const OFFSET: u32>(
     state: State,
-    width: NonZeroUsize,
     old_byte: u8,
     new_byte: u8,
 ) -> (Checksum, State) {
-    let width = width.get() as u32;
-
     let (a, b) = state;
     let a_new = (a - old_byte as u32 + new_byte as u32) % MODULUS;
-    let b_new = (b - width * (old_byte as u32 + OFFSET) + a_new) % MODULUS;
+    let b_new = (b - WINDOW_SIZE as u32 * (old_byte as u32 + OFFSET) + a_new) % MODULUS;
     let new_state = (a_new, b_new);
     let sum = b_new + (a_new << 16);
 
@@ -53,3 +42,7 @@ pub const fn process_byte_freestanding<const MODULUS: u32, const OFFSET: u32>(
 }
 
 pub type Rrs1 = Rrs<25_536, 31>;
+
+impl Named for Rrs1 {
+    const NAME: &'static str = "RRS1";
+}
