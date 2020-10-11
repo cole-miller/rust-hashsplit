@@ -2,7 +2,7 @@ This repository contains hashsplit, a Rust library for computing various kinds
 of rolling checksum. hashsplit aims to conform to the specifications collected
 in Ian Denhardt's (GitHub user @zenhack's) hashsplit-spec repository:
 
-	https://github.com/zenhack/hashsplit-spec
+	https://github.com/hashsplit/hashsplit-spec
 
 Like those specifications, this library is a work in progress.
 
