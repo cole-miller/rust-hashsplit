@@ -1,17 +1,21 @@
-This repository contains hashsplit, a Rust library for computing various kinds
-of rolling checksum. hashsplit aims to conform to the specifications collected
-in Ian Denhardt's (GitHub user @zenhack's) hashsplit-spec repository:
+This repository contains hashsplit, a Rust library aiming to implement the
+specification at
 
 	https://github.com/hashsplit/hashsplit-spec
 
-Like those specifications, this library is a work in progress.
+Like the specification, the library is a work in progress.
 
-Development takes place on the `develop` branch, with `master` being
-occasionally fast-forwarded to reflect progress. Commits that are not part of
-the `master` history may be amended, retracted, etc., without warning. When the
-crate gets its first release we'll adopt a more disciplined workflow.
+Building hashsplit currently requires nightly Rust, since we make use of
+`#![feature(min_const_generics)]`. Progress on stabilizing this feature is
+tracked at
+
+	https://github.com/rust-lang/rust/issues/74878
+
+hashsplit is `no_std`-compatible, but many definitions require dynamic
+allocation; these are marked `#[cfg(feature = "alloc")]`, with the `alloc`
+feature enabled by default.
 
 This repository is hosted at:
 
 	https://github.com/cole-miller/rust-hashsplit
-	https://git.cole-miller.net/rust-hashsplit
+	https://git.cole-miller.net/rust-hashsplit (read-only)
