@@ -10,5 +10,4 @@ alloc = []
 immutable-vector = ["im-rc"]
 
 [dependencies]
-either = "1.6.1"
 im-rc = { version = "15.0.0", optional = true }
