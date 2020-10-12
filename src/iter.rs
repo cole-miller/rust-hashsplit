@@ -1,6 +1,6 @@
-use crate::util::*;
 #[cfg(feature = "alloc")]
-use crate::ResumableChunk;
+use crate::chunk::ResumableChunk;
+use crate::util::*;
 use crate::{Hasher, Leveled, WINDOW_SIZE};
 
 #[cfg(feature = "alloc")]

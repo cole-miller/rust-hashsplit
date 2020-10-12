@@ -1,6 +1,11 @@
-use crate::{Hasher, ResumableChunk};
+use crate::Hasher;
 
-use alloc::boxed::Box;
+use alloc::{borrow::Cow, boxed::Box};
+
+pub struct ResumableChunk<'a, Hash: Hasher> {
+    pub chunk: Cow<'a, [u8]>,
+    pub state: Hash::State,
+}
 
 pub enum TreeNode<'a, Hash: Hasher> {
     Internal(Box<[Self]>),

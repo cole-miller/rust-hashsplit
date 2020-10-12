@@ -4,9 +4,6 @@
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
-#[cfg(feature = "alloc")]
-use alloc::borrow::Cow;
-
 pub const WINDOW_SIZE: usize = 64;
 
 pub trait Leveled {
@@ -86,14 +83,9 @@ pub trait Hasher {
         )
     }
 }
+
 pub trait Named: Hasher {
     const NAME: &'static str;
-}
-
-#[cfg(feature = "alloc")]
-pub struct ResumableChunk<'a, Hash: Hasher> {
-    pub chunk: Cow<'a, [u8]>,
-    pub state: Hash::State,
 }
 
 pub(crate) mod util {
@@ -113,8 +105,8 @@ pub(crate) mod util {
 }
 
 pub mod algorithms;
+#[cfg(feature = "alloc")]
+pub mod chunk;
 pub mod config;
 pub mod iter;
 pub mod thin;
-#[cfg(feature = "alloc")]
-pub mod tree;
