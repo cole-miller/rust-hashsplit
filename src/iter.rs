@@ -4,7 +4,7 @@ use crate::util::*;
 use crate::{Hasher, Leveled, WINDOW_SIZE};
 
 #[cfg(feature = "alloc")]
-use alloc::{borrow::Cow, vec::Vec};
+use alloc::vec::Vec;
 
 pub struct Rolling<Hash: Hasher, Source> {
     hasher: Hash,
@@ -216,10 +216,10 @@ where
                         .push(byte)
                 }
                 Either::Right(state) => {
-                    return self.preparing.take().map(|prep| ResumableChunk {
-                        chunk: Cow::from(prep),
-                        state,
-                    });
+                    return self
+                        .preparing
+                        .take()
+                        .map(|prep| ResumableChunk::new(prep, state));
                 }
             }
         }
@@ -286,10 +286,7 @@ where
             match ev.collapse() {
                 Either::Left(_) => self.counter += 1,
                 Either::Right(state) => {
-                    return self.reset().map(|span| ResumableChunk {
-                        chunk: Cow::from(span),
-                        state,
-                    })
+                    return self.reset().map(|span| ResumableChunk::new(span, state))
                 }
             }
         }
