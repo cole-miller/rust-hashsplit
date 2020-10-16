@@ -19,6 +19,7 @@ const PRIME_POW: u32 = {
     pow
 };
 
+#[derive(Default)]
 pub struct Bozo32;
 
 impl Hasher for Bozo32 {
