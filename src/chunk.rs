@@ -8,10 +8,7 @@ pub struct ResumableChunk<'a, Hash: Hasher> {
     pub state: Hash::State,
 }
 
-impl<'a, Hash> ResumableChunk<'a, Hash>
-where
-    Hash: Hasher,
-{
+impl<'a, Hash: Hasher> ResumableChunk<'a, Hash> {
     pub fn new<X: Into<Cow<'a, [u8]>>>(data: X, state: Hash::State) -> Self {
         Self {
             chunk: data.into(),
@@ -20,10 +17,7 @@ where
     }
 }
 
-impl<'a, Hash> Deref for ResumableChunk<'a, Hash>
-where
-    Hash: Hasher,
-{
+impl<'a, Hash: Hasher> Deref for ResumableChunk<'a, Hash> {
     type Target = [u8];
 
     fn deref(&self) -> &Self::Target {

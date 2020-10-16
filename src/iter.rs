@@ -15,11 +15,7 @@ pub struct Rolling<Hash: Hasher, Source> {
     pub source: Source,
 }
 
-impl<Hash, Source> Rolling<Hash, Source>
-where
-    Hash: Hasher,
-    Source: Iterator<Item = u8>,
-{
+impl<Hash: Hasher, Source: Iterator<Item = u8>> Rolling<Hash, Source> {
     pub fn start(hasher: Hash, source: Source) -> Self {
         Self {
             hasher,
@@ -47,11 +43,7 @@ where
     }
 }
 
-impl<Hash, Source> Iterator for Rolling<Hash, Source>
-where
-    Hash: Hasher,
-    Source: Iterator<Item = u8>,
-{
+impl<Hash: Hasher, Source: Iterator<Item = u8>> Iterator for Rolling<Hash, Source> {
     type Item = Hash::Checksum;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -61,20 +53,13 @@ where
 
 pub struct WithRolling<Hash: Hasher, Source>(pub Rolling<Hash, Source>);
 
-impl<Hash, Source> WithRolling<Hash, Source>
-where
-    Hash: Hasher,
-{
+impl<Hash: Hasher, Source> WithRolling<Hash, Source> {
     pub fn state(&self) -> &Hash::State {
         &self.0.state
     }
 }
 
-impl<Hash, Source> Iterator for WithRolling<Hash, Source>
-where
-    Hash: Hasher,
-    Source: Iterator<Item = u8>,
-{
+impl<Hash: Hasher, Source: Iterator<Item = u8>> Iterator for WithRolling<Hash, Source> {
     type Item = (u8, Hash::Checksum);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -96,10 +81,7 @@ enum Either<L, R> {
     Right(R),
 }
 
-impl<Hash> Event<Hash>
-where
-    Hash: Hasher,
-{
+impl<Hash: Hasher> Event<Hash> {
     fn collapse(self) -> Either<u8, Hash::State> {
         match self {
             Event::Data(byte) => Either::Left(byte),
@@ -123,11 +105,13 @@ pub struct Delimited<
     pub input: WithRolling<Hash, Source>,
 }
 
-impl<Hash, Source, const THRESHOLD: u32, const MIN_SIZE: usize, const MAX_SIZE: usize>
-    Delimited<Hash, Source, THRESHOLD, MIN_SIZE, MAX_SIZE>
-where
-    Hash: Hasher,
-    Source: Iterator<Item = u8>,
+impl<
+        Hash: Hasher,
+        Source: Iterator<Item = u8>,
+        const THRESHOLD: u32,
+        const MIN_SIZE: usize,
+        const MAX_SIZE: usize,
+    > Delimited<Hash, Source, THRESHOLD, MIN_SIZE, MAX_SIZE>
 {
     pub fn start(hasher: Hash, source: Source) -> Self {
         Self {
@@ -148,13 +132,16 @@ where
     }
 }
 
-impl<Hash, Source, const THRESHOLD: u32, const MIN_SIZE: usize, const MAX_SIZE: usize> Iterator
-    for Delimited<Hash, Source, THRESHOLD, MIN_SIZE, MAX_SIZE>
+impl<
+        Hash: Hasher,
+        Source: Iterator<Item = u8>,
+        const THRESHOLD: u32,
+        const MIN_SIZE: usize,
+        const MAX_SIZE: usize,
+    > Iterator for Delimited<Hash, Source, THRESHOLD, MIN_SIZE, MAX_SIZE>
 where
-    Hash: Hasher,
     Hash::Checksum: Leveled,
     Hash::State: Clone,
-    Source: Iterator<Item = u8>,
 {
     type Item = Event<Hash>;
 
@@ -199,11 +186,7 @@ pub struct Splits<Source> {
 }
 
 #[cfg(feature = "alloc")]
-impl<Hash, Source> Iterator for Splits<Source>
-where
-    Hash: Hasher,
-    Source: Iterator<Item = Event<Hash>>,
-{
+impl<Hash: Hasher, Source: Iterator<Item = Event<Hash>>> Iterator for Splits<Source> {
     type Item = ResumableChunk<'static, Hash>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -248,10 +231,8 @@ pub struct Spans<
 }
 
 #[cfg(feature = "alloc")]
-impl<'a, Hash, const THRESHOLD: u32, const MIN_SIZE: usize, const MAX_SIZE: usize>
+impl<'a, Hash: Hasher, const THRESHOLD: u32, const MIN_SIZE: usize, const MAX_SIZE: usize>
     Spans<'a, Hash, THRESHOLD, MIN_SIZE, MAX_SIZE>
-where
-    Hash: Hasher,
 {
     pub fn start(hasher: Hash, data: &'a [u8]) -> Self {
         Self {
@@ -272,10 +253,9 @@ where
 }
 
 #[cfg(feature = "alloc")]
-impl<'a, Hash, const THRESHOLD: u32, const MIN_SIZE: usize, const MAX_SIZE: usize> Iterator
+impl<'a, Hash: Hasher, const THRESHOLD: u32, const MIN_SIZE: usize, const MAX_SIZE: usize> Iterator
     for Spans<'a, Hash, THRESHOLD, MIN_SIZE, MAX_SIZE>
 where
-    Hash: Hasher,
     Hash::Checksum: Leveled,
     Hash::State: Clone,
 {

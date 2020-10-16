@@ -7,10 +7,8 @@ pub struct Config<Hash, const THRESHOLD: u32, const MIN_SIZE: usize, const MAX_S
     pub hasher: Hash,
 }
 
-impl<Hash, const THRESHOLD: u32, const MIN_SIZE: usize, const MAX_SIZE: usize>
+impl<Hash: Hasher, const THRESHOLD: u32, const MIN_SIZE: usize, const MAX_SIZE: usize>
     Config<Hash, THRESHOLD, MIN_SIZE, MAX_SIZE>
-where
-    Hash: Hasher,
 {
     pub fn new(hasher: Hash) -> Self {
         Self { hasher }
@@ -48,10 +46,8 @@ impl core::fmt::Display for Size {
     }
 }
 
-impl<Hash, const THRESHOLD: u32, const MIN_SIZE: usize, const MAX_SIZE: usize> core::fmt::Display
-    for Config<Hash, THRESHOLD, MIN_SIZE, MAX_SIZE>
-where
-    Hash: Named,
+impl<Hash: Named, const THRESHOLD: u32, const MIN_SIZE: usize, const MAX_SIZE: usize>
+    core::fmt::Display for Config<Hash, THRESHOLD, MIN_SIZE, MAX_SIZE>
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> Result<(), core::fmt::Error> {
         write!(
