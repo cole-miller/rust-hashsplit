@@ -2,7 +2,7 @@
 use crate::iter::{Delimited, Spans};
 use crate::{Hasher, Named};
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct Config<Hash, const THRESHOLD: u32, const MIN_SIZE: usize, const MAX_SIZE: usize> {
     pub hasher: Hash,
 }
