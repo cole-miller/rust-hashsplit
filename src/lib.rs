@@ -110,3 +110,5 @@ pub mod chunk;
 pub mod config;
 pub mod iter;
 pub mod thin;
+
+pub use config::Config;
