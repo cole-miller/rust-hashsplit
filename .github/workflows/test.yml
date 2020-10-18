@@ -1,0 +1,19 @@
+on:
+  push:
+    branches: [ develop ]
+  pull_request:
+    branches: [ master, develop ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: run tests
+      run: cargo test --verbose
+    - name: run tests (no_std)
+      run: cargo test --verbose --no-default-features
+
