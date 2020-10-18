@@ -1,3 +1,5 @@
+#[cfg(feature = "alloc")]
+use crate::iter::Spans;
 use crate::iter::{Delimited, Distances};
 #[allow(unused)]
 use crate::util::*;
@@ -29,6 +31,12 @@ impl<Hash: Hasher, const THRESHOLD: u32, const MIN_SIZE: usize, const MAX_SIZE: 
         source: Source,
     ) -> Distances<Hash, Source, THRESHOLD, MIN_SIZE, MAX_SIZE> {
         Distances::start(self.hasher, source)
+    }
+
+    #[cfg(feature = "alloc")]
+    #[doc(cfg(feature = "alloc"))]
+    pub fn span<'a>(self, data: &'a [u8]) -> Spans<'a, Hash, THRESHOLD, MIN_SIZE, MAX_SIZE> {
+        Spans::start(self.hasher, data)
     }
 }
 
