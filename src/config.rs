@@ -35,7 +35,7 @@ impl<Hash: Hasher, const THRESHOLD: u32, const MIN_SIZE: usize, const MAX_SIZE: 
 
     #[cfg(feature = "alloc")]
     #[doc(cfg(feature = "alloc"))]
-    pub fn span<'a>(self, data: &'a [u8]) -> Spans<'a, Hash, THRESHOLD, MIN_SIZE, MAX_SIZE> {
+    pub fn spans<'a>(self, data: &'a [u8]) -> Spans<'a, Hash, THRESHOLD, MIN_SIZE, MAX_SIZE> {
         Spans::start(self.hasher, data)
     }
 }
