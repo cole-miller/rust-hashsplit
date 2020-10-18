@@ -1,6 +1,6 @@
 [package]
 name = "hashsplit"
-version = "0.1.0"
+version = "0.0.1"
 authors = ["Cole Miller <m@cole-miller.net>"]
 edition = "2018"
 
