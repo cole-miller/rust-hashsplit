@@ -123,7 +123,7 @@ impl<
     }
 
     #[cfg(feature = "alloc")]
-    pub fn split(self) -> Splits<Self> {
+    pub fn splits(self) -> Splits<Self> {
         Splits {
             reserve: 2 * MIN_SIZE, // XXX
             preparing: None,
