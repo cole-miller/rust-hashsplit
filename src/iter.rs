@@ -214,7 +214,7 @@ impl<Hash: Hasher, Source: Iterator<Item = Event<Hash>>> Iterator for Splits<Sou
     }
 }
 
-pub struct Extend<Hash: Hasher> {
+pub struct Extent<Hash: Hasher> {
     pub length: NonZeroUsize,
     pub boundary: Boundary<Hash>,
 }
@@ -247,8 +247,8 @@ impl<
         }
     }
 
-    fn yield_extend(&mut self, boundary: Boundary<Hash>) -> Option<Extend<Hash>> {
-        Some(Extend {
+    fn yield_extent(&mut self, boundary: Boundary<Hash>) -> Option<Extent<Hash>> {
+        Some(Extent {
             length: NonZeroUsize::new(core::mem::replace(&mut self.counter, 0))?,
             boundary,
         })
@@ -266,7 +266,7 @@ where
     Hash::Checksum: Leveled,
     Hash::State: Clone,
 {
-    type Item = Extend<Hash>;
+    type Item = Extent<Hash>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.halt {
@@ -278,15 +278,15 @@ where
 
             let lev = sum.level();
             if lev >= THRESHOLD && self.counter >= MIN_SIZE {
-                return self.yield_extend(Boundary::Level(lev, self.input.state.clone()));
+                return self.yield_extent(Boundary::Level(lev, self.input.state.clone()));
             } else if self.counter == MAX_SIZE {
-                return self.yield_extend(Boundary::Capped(self.input.state.clone()));
+                return self.yield_extent(Boundary::Capped(self.input.state.clone()));
             }
         }
 
         self.halt = true;
 
-        self.yield_extend(Boundary::Eof(self.input.state.clone()))
+        self.yield_extent(Boundary::Eof(self.input.state.clone()))
     }
 }
 
@@ -333,7 +333,7 @@ where
     type Item = ResumableChunk<'a, Hash>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.distances.next().map(|Extend { length, boundary }| {
+        self.distances.next().map(|Extent { length, boundary }| {
             let prev = self.saved;
             self.saved = &prev[length.get()..];
 
