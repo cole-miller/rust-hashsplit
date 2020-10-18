@@ -13,7 +13,6 @@ pub struct Rolling<Hash: Hasher, Source> {
     state: Hash::State,
     begin: usize,
     ring: [u8; WINDOW_SIZE],
-    /// The input iterator.
     pub source: Source,
 }
 

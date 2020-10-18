@@ -2,11 +2,11 @@
 #![feature(min_const_generics)]
 #![feature(doc_cfg)]
 
-#[allow(unused)]
-use crate::util::*;
-
 #[cfg(feature = "alloc")]
 extern crate alloc;
+
+#[allow(unused)]
+use crate::util::*;
 
 pub const WINDOW_SIZE: usize = 64;
 
@@ -48,29 +48,13 @@ implement_leveled_for_integer_primitive! {u32}
 implement_leveled_for_integer_primitive! {u64}
 implement_leveled_for_integer_primitive! {u8}
 
-/// Defines the interface expected from each rolling hash function.
-///
-/// All hashsplitting operations are generic over this trait.
 pub trait Hasher {
-    /// The type of values returned by this hash function.
     type Checksum: Default;
 
-    /// The type of data carried between successive invocations of this hash function during
-    /// rolling computation.
     type State;
 
-    /// Starting value of the state data for rolling computations.
     const INITIAL_STATE: Self::State;
 
-    /// Specify how to compute this hash function.
-    ///
-    /// Arguments:
-    ///
-    /// * `state`: state data from the previous rolling invocation
-    /// * `old_byte`: the byte leaving the rolling window
-    /// * `new_byte`: the byte entering the rolling window
-    ///
-    /// Return a checksum and new state data for the next rolling computation.
     fn process_byte(
         &self,
         state: Self::State,
