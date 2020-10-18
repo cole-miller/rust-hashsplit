@@ -1,7 +1,9 @@
 /*!
-Rolling hash functions that support "thinning" by skipping many intermediate checksum values.
+Rolling hash functions that support “thinning” by skipping many intermediate checksum values.
 */
 
+#[allow(unused)]
+use crate::util::*;
 use crate::Hasher;
 
 /// Extension trait describing rolling hash functions that can be efficiently implemented to
@@ -18,9 +20,17 @@ pub trait Thinned<Block: AsRef<[u8]>>: Hasher {
     fn process_block(
         &self,
         state: Self::State,
-        old_data: &[u8],
-        new_data: &Block,
+        old_block: &[u8],
+        new_block: &Block,
     ) -> (Self::Checksum, Self::State) {
-        self.process_slice(state, old_data, new_data.as_ref())
+        assert_eq!(old_block.len(), Self::BLOCK_SIZE);
+
+        self.process_sequence(
+            state,
+            old_block
+                .iter()
+                .copied()
+                .zip(new_block.as_ref().iter().copied()),
+        )
     }
 }

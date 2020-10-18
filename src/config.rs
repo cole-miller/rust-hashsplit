@@ -1,8 +1,11 @@
-#[cfg(feature = "alloc")]
-use crate::iter::{Delimited, Spans};
+use crate::iter::{Delimited, Distances};
+#[allow(unused)]
+use crate::util::*;
 use crate::{Hasher, Named};
 
-#[derive(Clone, Default)]
+use core::fmt;
+
+#[derive(Clone, Copy, Default)]
 pub struct Config<Hash, const THRESHOLD: u32, const MIN_SIZE: usize, const MAX_SIZE: usize> {
     pub hasher: Hash,
 }
@@ -14,7 +17,6 @@ impl<Hash: Hasher, const THRESHOLD: u32, const MIN_SIZE: usize, const MAX_SIZE: 
         Self { hasher }
     }
 
-    #[cfg(feature = "alloc")]
     pub fn delimited<Source: Iterator<Item = u8>>(
         self,
         source: Source,
@@ -22,16 +24,18 @@ impl<Hash: Hasher, const THRESHOLD: u32, const MIN_SIZE: usize, const MAX_SIZE: 
         Delimited::start(self.hasher, source)
     }
 
-    #[cfg(feature = "alloc")]
-    pub fn spans(self, data: &[u8]) -> Spans<'_, Hash, THRESHOLD, MIN_SIZE, MAX_SIZE> {
-        Spans::start(self.hasher, data)
+    pub fn distances<Source: Iterator<Item = u8>>(
+        self,
+        source: Source,
+    ) -> Distances<Hash, Source, THRESHOLD, MIN_SIZE, MAX_SIZE> {
+        Distances::start(self.hasher, source)
     }
 }
 
 struct Size(usize);
 
-impl core::fmt::Display for Size {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> Result<(), core::fmt::Error> {
+impl fmt::Display for Size {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         let z = self.0;
 
         if z % (1 << 30) == 0 {
@@ -46,10 +50,18 @@ impl core::fmt::Display for Size {
     }
 }
 
-impl<Hash: Named, const THRESHOLD: u32, const MIN_SIZE: usize, const MAX_SIZE: usize>
-    core::fmt::Display for Config<Hash, THRESHOLD, MIN_SIZE, MAX_SIZE>
+/// ```
+/// # use hashsplit::Config;
+/// use hashsplit::algorithms::Rrs1;
+///
+/// let cfg: Config<Rrs1, 13, 0x01_00_00, 0x20_00_00> = Default::default();
+///
+/// assert_eq!("HashSplit_13_RRS1_64Ki_2Mi", cfg.to_string());
+/// ```
+impl<Hash: Named, const THRESHOLD: u32, const MIN_SIZE: usize, const MAX_SIZE: usize> fmt::Display
+    for Config<Hash, THRESHOLD, MIN_SIZE, MAX_SIZE>
 {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> Result<(), core::fmt::Error> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         write!(
             f,
             "HashSplit_{}_{}_{}_{}",
@@ -58,19 +70,5 @@ impl<Hash: Named, const THRESHOLD: u32, const MIN_SIZE: usize, const MAX_SIZE: u
             Size(MIN_SIZE),
             Size(MAX_SIZE)
         )
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::algorithms::rrs::Rrs1;
-
-    use alloc::string::ToString;
-
-    #[test]
-    fn display_basic_config() {
-        let x: Config<Rrs1, 13, 65_536, 2_097_152> = Default::default();
-        assert_eq!("HashSplit_13_RRS1_64Ki_2Mi", x.to_string())
     }
 }

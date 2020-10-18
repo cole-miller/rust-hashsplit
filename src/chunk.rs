@@ -1,3 +1,5 @@
+#[allow(unused)]
+use crate::util::*;
 use crate::Hasher;
 
 use alloc::{borrow::Cow, boxed::Box};
@@ -9,7 +11,7 @@ pub struct ResumableChunk<'a, Hash: Hasher> {
 }
 
 impl<'a, Hash: Hasher> ResumableChunk<'a, Hash> {
-    pub fn new<X: Into<Cow<'a, [u8]>>>(data: X, state: Hash::State) -> Self {
+    pub fn new<T: Into<Cow<'a, [u8]>>>(data: T, state: Hash::State) -> Self {
         Self {
             chunk: data.into(),
             state,
@@ -21,7 +23,7 @@ impl<'a, Hash: Hasher> Deref for ResumableChunk<'a, Hash> {
     type Target = [u8];
 
     fn deref(&self) -> &Self::Target {
-        &self.chunk
+        self.chunk.deref()
     }
 }
 

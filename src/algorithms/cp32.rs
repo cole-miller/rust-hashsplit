@@ -1,3 +1,5 @@
+#[allow(unused)]
+use crate::util::*;
 use crate::{Hasher, Named};
 
 pub type Checksum = u32;
@@ -39,7 +41,7 @@ const LOOKUP: [u32; 256] = [
     0xd1ba98d8, 0x9b9f1794, 0xe8961c84, 0x9d773b17, 0xf9783ee9, 0xdff11758, 0x49bea2cf, 0xa0e0887f,
 ];
 
-#[derive(Default)]
+#[derive(Clone, Copy, Default)]
 pub struct Cp32;
 
 impl Hasher for Cp32 {
@@ -54,10 +56,14 @@ impl Hasher for Cp32 {
     }
 }
 
-pub const fn process_byte_freestanding(state: State, old_byte: u8, new_byte: u8) -> (Checksum, State) {
-        let sum = state.rotate_left(1) ^ LOOKUP[old_byte as usize] ^ LOOKUP[new_byte as usize];
+pub const fn process_byte_freestanding(
+    state: State,
+    old_byte: u8,
+    new_byte: u8,
+) -> (Checksum, State) {
+    let sum = state.rotate_left(1) ^ LOOKUP[old_byte as usize] ^ LOOKUP[new_byte as usize];
 
-        (sum, sum)
+    (sum, sum)
 }
 
 impl Named for Cp32 {

@@ -1,3 +1,5 @@
+#[allow(unused)]
+use crate::util::*;
 use crate::{Hasher, Named, WINDOW_SIZE};
 
 pub type Checksum = u32;
@@ -19,7 +21,7 @@ const PRIME_POW: u32 = {
     pow
 };
 
-#[derive(Default)]
+#[derive(Clone, Copy, Default)]
 pub struct Bozo32;
 
 impl Hasher for Bozo32 {

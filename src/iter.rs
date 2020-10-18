@@ -1,10 +1,12 @@
 #[cfg(feature = "alloc")]
 use crate::chunk::ResumableChunk;
+#[allow(unused)]
 use crate::util::*;
 use crate::{Hasher, Leveled, WINDOW_SIZE};
 
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
+use core::num::NonZeroUsize;
 
 pub struct Rolling<Hash: Hasher, Source> {
     hasher: Hash,
@@ -69,27 +71,25 @@ impl<Hash: Hasher, Source: Iterator<Item = u8>> Iterator for WithRolling<Hash, S
     }
 }
 
-pub enum Event<Hash: Hasher> {
-    Data(u8),
-    Boundary(u32, Hash::State),
+pub enum Boundary<Hash: Hasher> {
+    Level(u32, Hash::State),
     Capped(Hash::State),
     Eof(Hash::State),
 }
 
-enum Either<L, R> {
-    Left(L),
-    Right(R),
-}
-
-impl<Hash: Hasher> Event<Hash> {
-    fn collapse(self) -> Either<u8, Hash::State> {
+impl<Hash: Hasher> Boundary<Hash> {
+    pub fn into_state(self) -> Hash::State {
         match self {
-            Event::Data(byte) => Either::Left(byte),
-            Event::Boundary(_, state) => Either::Right(state),
-            Event::Capped(state) => Either::Right(state),
-            Event::Eof(state) => Either::Right(state),
+            Self::Level(_, state) => state,
+            Self::Capped(state) => state,
+            Self::Eof(state) => state,
         }
     }
+}
+
+pub enum Event<Hash: Hasher> {
+    Data(u8),
+    Boundary(Boundary<Hash>),
 }
 
 pub struct Delimited<
@@ -146,12 +146,16 @@ where
     type Item = Event<Hash>;
 
     fn next(&mut self) -> Option<Self::Item> {
+        if self.halt {
+            return None;
+        }
+
         if let Some((may, state)) = self.prepared.take() {
-            if let Some(lev) = may {
-                return Some(Event::Boundary(lev, state));
+            return Some(Event::Boundary(if let Some(lev) = may {
+                Boundary::Level(lev, state)
             } else {
-                return Some(Event::Capped(state));
-            }
+                Boundary::Capped(state)
+            }));
         }
 
         if let Some((byte, sum)) = self.input.next() {
@@ -160,6 +164,7 @@ where
             let lev = sum.level();
             if lev >= THRESHOLD && self.counter >= MIN_SIZE {
                 self.prepared = Some((Some(lev), self.input.state().clone()));
+                self.counter = 0;
             } else if self.counter == MAX_SIZE {
                 self.prepared = Some((None, self.input.state().clone()));
                 self.counter = 0;
@@ -168,17 +173,14 @@ where
             return Some(Event::Data(byte));
         }
 
-        if !self.halt {
-            self.halt = true;
+        self.halt = true;
 
-            return Some(Event::Eof(self.input.state().clone()));
-        }
-
-        None
+        Some(Event::Boundary(Boundary::Eof(self.input.state().clone())))
     }
 }
 
 #[cfg(feature = "alloc")]
+#[doc(cfg(feature = "alloc"))]
 pub struct Splits<Source> {
     reserve: usize,
     preparing: Option<Vec<u8>>,
@@ -186,23 +188,25 @@ pub struct Splits<Source> {
 }
 
 #[cfg(feature = "alloc")]
+#[doc(cfg(feature = "alloc"))]
 impl<Hash: Hasher, Source: Iterator<Item = Event<Hash>>> Iterator for Splits<Source> {
     type Item = ResumableChunk<'static, Hash>;
 
     fn next(&mut self) -> Option<Self::Item> {
         while let Some(ev) = self.source.next() {
-            match ev.collapse() {
-                Either::Left(byte) => {
+            match ev {
+                Event::Data(byte) => {
                     let reserve = self.reserve;
+
                     self.preparing
                         .get_or_insert_with(|| Vec::with_capacity(reserve))
                         .push(byte)
                 }
-                Either::Right(state) => {
+                Event::Boundary(bd) => {
                     return self
                         .preparing
                         .take()
-                        .map(|prep| ResumableChunk::new(prep, state));
+                        .map(|prep| ResumableChunk::new(prep, bd.into_state()));
                 }
             }
         }
@@ -211,7 +215,84 @@ impl<Hash: Hasher, Source: Iterator<Item = Event<Hash>>> Iterator for Splits<Sou
     }
 }
 
+pub struct Extend<Hash: Hasher> {
+    pub length: NonZeroUsize,
+    pub boundary: Boundary<Hash>,
+}
+
+pub struct Distances<
+    Hash: Hasher,
+    Source,
+    const THRESHOLD: u32,
+    const MIN_SIZE: usize,
+    const MAX_SIZE: usize,
+> {
+    counter: usize,
+    halt: bool,
+    pub input: Rolling<Hash, Source>,
+}
+
+impl<
+        Hash: Hasher,
+        Source: Iterator<Item = u8>,
+        const THRESHOLD: u32,
+        const MIN_SIZE: usize,
+        const MAX_SIZE: usize,
+    > Distances<Hash, Source, THRESHOLD, MIN_SIZE, MAX_SIZE>
+{
+    pub fn start(hasher: Hash, source: Source) -> Self {
+        Self {
+            counter: 0,
+            halt: false,
+            input: Rolling::start(hasher, source),
+        }
+    }
+
+    fn yield_extend(&mut self, boundary: Boundary<Hash>) -> Option<Extend<Hash>> {
+        Some(Extend {
+            length: NonZeroUsize::new(core::mem::replace(&mut self.counter, 0))?,
+            boundary,
+        })
+    }
+}
+
+impl<
+        Hash: Hasher,
+        Source: Iterator<Item = u8>,
+        const THRESHOLD: u32,
+        const MIN_SIZE: usize,
+        const MAX_SIZE: usize,
+    > Iterator for Distances<Hash, Source, THRESHOLD, MIN_SIZE, MAX_SIZE>
+where
+    Hash::Checksum: Leveled,
+    Hash::State: Clone,
+{
+    type Item = Extend<Hash>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.halt {
+            return None;
+        }
+
+        while let Some(sum) = self.input.next() {
+            self.counter += 1;
+
+            let lev = sum.level();
+            if lev >= THRESHOLD && self.counter >= MIN_SIZE {
+                return self.yield_extend(Boundary::Level(lev, self.input.state.clone()));
+            } else if self.counter == MAX_SIZE {
+                return self.yield_extend(Boundary::Capped(self.input.state.clone()));
+            }
+        }
+
+        self.halt = true;
+
+        self.yield_extend(Boundary::Eof(self.input.state.clone()))
+    }
+}
+
 #[cfg(feature = "alloc")]
+#[doc(cfg(feature = "alloc"))]
 pub struct Spans<
     'a,
     Hash: Hasher,
@@ -219,9 +300,8 @@ pub struct Spans<
     const MIN_SIZE: usize,
     const MAX_SIZE: usize,
 > {
-    counter: usize,
     saved: &'a [u8],
-    delimited: Delimited<
+    distances: Distances<
         Hash,
         core::iter::Copied<core::slice::Iter<'a, u8>>,
         THRESHOLD,
@@ -231,28 +311,20 @@ pub struct Spans<
 }
 
 #[cfg(feature = "alloc")]
+#[doc(cfg(feature = "alloc"))]
 impl<'a, Hash: Hasher, const THRESHOLD: u32, const MIN_SIZE: usize, const MAX_SIZE: usize>
     Spans<'a, Hash, THRESHOLD, MIN_SIZE, MAX_SIZE>
 {
     pub fn start(hasher: Hash, data: &'a [u8]) -> Self {
         Self {
-            counter: 0,
             saved: data,
-            delimited: Delimited::start(hasher, data.iter().copied()),
+            distances: Distances::start(hasher, data.iter().copied()),
         }
-    }
-
-    fn reset(&mut self) -> Option<&'a [u8]> {
-        (self.counter > 0).check().and_then(|_| {
-            let prev = self.saved;
-            self.saved = &prev[self.counter..];
-
-            Some(&prev[..self.counter])
-        })
     }
 }
 
 #[cfg(feature = "alloc")]
+#[doc(cfg(feature = "alloc"))]
 impl<'a, Hash: Hasher, const THRESHOLD: u32, const MIN_SIZE: usize, const MAX_SIZE: usize> Iterator
     for Spans<'a, Hash, THRESHOLD, MIN_SIZE, MAX_SIZE>
 where
@@ -262,15 +334,11 @@ where
     type Item = ResumableChunk<'a, Hash>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some(ev) = self.delimited.next() {
-            match ev.collapse() {
-                Either::Left(_) => self.counter += 1,
-                Either::Right(state) => {
-                    return self.reset().map(|span| ResumableChunk::new(span, state))
-                }
-            }
-        }
+        self.distances.next().map(|Extend { length, boundary }| {
+            let prev = self.saved;
+            self.saved = &prev[length.get()..];
 
-        None
+            ResumableChunk::new(&prev[..length.get()], boundary.into_state())
+        })
     }
 }

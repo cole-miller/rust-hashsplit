@@ -1,5 +1,9 @@
 #![no_std]
 #![feature(min_const_generics)]
+#![feature(doc_cfg)]
+
+#[allow(unused)]
+use crate::util::*;
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
@@ -10,9 +14,15 @@ pub trait Leveled {
     fn level(self) -> u32;
 }
 
+/// ```
+/// use hashsplit::Leveled;
+///
+/// assert_eq!(false.level(), 0);
+/// assert_eq!(true.level(), 1);
+/// ```
 impl Leveled for bool {
     fn level(self) -> u32 {
-        !self as u32
+        self as u32
     }
 }
 
@@ -54,9 +64,13 @@ pub trait Hasher {
 
     /// Specify how to compute this hash function.
     ///
-    /// A rolling hash function takes as input some state data, the value of the byte passing out
-    /// of its window, and the value of the byte entering its window, and returns a checksum along
-    /// with new state data to be propagated to the next invocation.
+    /// Arguments:
+    ///
+    /// * `state`: state data from the previous rolling invocation
+    /// * `old_byte`: the byte leaving the rolling window
+    /// * `new_byte`: the byte entering the rolling window
+    ///
+    /// Return a checksum and new state data for the next rolling computation.
     fn process_byte(
         &self,
         state: Self::State,
@@ -64,18 +78,12 @@ pub trait Hasher {
         new_byte: u8,
     ) -> (Self::Checksum, Self::State);
 
-    /// Compute this rolling hash function for each byte in a contiguous range, returning only the
-    /// final checksum and state data.
-    ///
-    /// If this method is overriden by an implementor, the overriding definition must return the
-    /// same values as the provided definition for identical inputs.
-    fn process_slice(
+    fn process_sequence<I: IntoIterator<Item = (u8, u8)>>(
         &self,
         state: Self::State,
-        old_data: &[u8],
-        new_data: &[u8],
+        bytes: I,
     ) -> (Self::Checksum, Self::State) {
-        old_data.iter().copied().zip(new_data.iter().copied()).fold(
+        bytes.into_iter().fold(
             (Default::default(), state),
             |(_, prev_state), (old_byte, new_byte)| {
                 self.process_byte(prev_state, old_byte, new_byte)
@@ -106,6 +114,7 @@ pub(crate) mod util {
 
 pub mod algorithms;
 #[cfg(feature = "alloc")]
+#[doc(cfg(feature = "alloc"))]
 pub mod chunk;
 pub mod config;
 pub mod iter;
