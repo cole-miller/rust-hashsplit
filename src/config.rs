@@ -34,7 +34,6 @@ impl<Hash: Hasher, const THRESHOLD: u32, const MIN_SIZE: usize, const MAX_SIZE: 
     }
 
     #[cfg(feature = "alloc")]
-    #[doc(cfg(feature = "alloc"))]
     pub fn spans<'a>(self, data: &'a [u8]) -> Spans<'a, Hash, THRESHOLD, MIN_SIZE, MAX_SIZE> {
         Spans::start(self.hasher, data)
     }
@@ -59,8 +58,7 @@ impl fmt::Display for Size {
 }
 
 /// ```
-/// # use hashsplit::Config;
-/// use hashsplit::algorithms::Rrs1;
+/// use hashsplit::{Config, algorithms::Rrs1};
 ///
 /// let cfg: Config<Rrs1, 13, 0x01_00_00, 0x20_00_00> = Default::default();
 ///

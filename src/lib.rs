@@ -1,6 +1,6 @@
 #![no_std]
+#![deny(unsafe_code)]
 #![feature(min_const_generics)]
-#![feature(doc_cfg)]
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
@@ -98,7 +98,6 @@ pub(crate) mod util {
 
 pub mod algorithms;
 #[cfg(feature = "alloc")]
-#[doc(cfg(feature = "alloc"))]
 pub mod chunk;
 pub mod config;
 pub mod iter;

@@ -6,6 +6,7 @@ use crate::{Hasher, Leveled, WINDOW_SIZE};
 
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
+use core::iter::FusedIterator;
 use core::num::NonZeroUsize;
 
 pub struct Rolling<Hash: Hasher, Source> {
@@ -16,7 +17,7 @@ pub struct Rolling<Hash: Hasher, Source> {
     pub source: Source,
 }
 
-impl<Hash: Hasher, Source: Iterator<Item = u8>> Rolling<Hash, Source> {
+impl<Hash: Hasher, Source> Rolling<Hash, Source> {
     pub fn start(hasher: Hash, source: Source) -> Self {
         Self {
             hasher,
@@ -50,6 +51,20 @@ impl<Hash: Hasher, Source: Iterator<Item = u8>> Iterator for Rolling<Hash, Sourc
     fn next(&mut self) -> Option<Self::Item> {
         self.source.next().map(|byte| self.feed(byte))
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.source.size_hint()
+    }
+}
+
+impl<Hash: Hasher, Source: Iterator<Item = u8> + ExactSizeIterator> ExactSizeIterator
+    for Rolling<Hash, Source>
+{
+}
+
+impl<Hash: Hasher, Source: Iterator<Item = u8> + FusedIterator> FusedIterator
+    for Rolling<Hash, Source>
+{
 }
 
 pub struct WithRolling<Hash: Hasher, Source>(pub Rolling<Hash, Source>);
@@ -68,6 +83,20 @@ impl<Hash: Hasher, Source: Iterator<Item = u8>> Iterator for WithRolling<Hash, S
 
         rolling.source.next().map(|byte| (byte, rolling.feed(byte)))
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.0.source.size_hint()
+    }
+}
+
+impl<Hash: Hasher, Source: Iterator<Item = u8> + ExactSizeIterator> ExactSizeIterator
+    for WithRolling<Hash, Source>
+{
+}
+
+impl<Hash: Hasher, Source: Iterator<Item = u8> + FusedIterator> FusedIterator
+    for WithRolling<Hash, Source>
+{
 }
 
 pub enum Boundary<Hash: Hasher> {
@@ -104,13 +133,8 @@ pub struct Delimited<
     pub input: WithRolling<Hash, Source>,
 }
 
-impl<
-        Hash: Hasher,
-        Source: Iterator<Item = u8>,
-        const THRESHOLD: u32,
-        const MIN_SIZE: usize,
-        const MAX_SIZE: usize,
-    > Delimited<Hash, Source, THRESHOLD, MIN_SIZE, MAX_SIZE>
+impl<Hash: Hasher, Source, const THRESHOLD: u32, const MIN_SIZE: usize, const MAX_SIZE: usize>
+    Delimited<Hash, Source, THRESHOLD, MIN_SIZE, MAX_SIZE>
 {
     pub fn start(hasher: Hash, source: Source) -> Self {
         Self {
@@ -176,10 +200,31 @@ where
 
         Some(Event::Boundary(Boundary::Eof(self.input.state().clone())))
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let (lower, upper) = self.input.size_hint();
+
+        (
+            lower + (lower + MAX_SIZE - 1) / MAX_SIZE,
+            upper.map(|n| n + (n + MIN_SIZE - 1) / MIN_SIZE),
+        )
+    }
+}
+
+impl<
+        Hash: Hasher,
+        Source: Iterator<Item = u8>,
+        const THRESHOLD: u32,
+        const MIN_SIZE: usize,
+        const MAX_SIZE: usize,
+    > FusedIterator for Delimited<Hash, Source, THRESHOLD, MIN_SIZE, MAX_SIZE>
+where
+    Hash::Checksum: Leveled,
+    Hash::State: Clone,
+{
 }
 
 #[cfg(feature = "alloc")]
-#[doc(cfg(feature = "alloc"))]
 pub struct Splits<Source> {
     reserve: usize,
     preparing: Option<Vec<u8>>,
@@ -187,7 +232,6 @@ pub struct Splits<Source> {
 }
 
 #[cfg(feature = "alloc")]
-#[doc(cfg(feature = "alloc"))]
 impl<Hash: Hasher, Source: Iterator<Item = Event<Hash>>> Iterator for Splits<Source> {
     type Item = ResumableChunk<'static, Hash>;
 
@@ -212,6 +256,20 @@ impl<Hash: Hasher, Source: Iterator<Item = Event<Hash>>> Iterator for Splits<Sou
 
         None
     }
+
+    // TODO once specialization is available we can provide a sharper `size_hint` for
+    // `Splits<Delimited<...>>`
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let (lower, upper) = self.source.size_hint();
+
+        (if lower == 0 { 0 } else { 1 }, upper.map(|n| n / 2))
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<Hash: Hasher, Source: Iterator<Item = Event<Hash>> + FusedIterator> FusedIterator
+    for Splits<Source>
+{
 }
 
 pub struct Extent<Hash: Hasher> {
@@ -288,10 +346,31 @@ where
 
         self.yield_extent(Boundary::Eof(self.input.state.clone()))
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let (lower, upper) = self.input.size_hint();
+
+        (
+            (lower + MAX_SIZE - 1) / MAX_SIZE,
+            upper.map(|n| (n + MIN_SIZE - 1) / MIN_SIZE),
+        )
+    }
+}
+
+impl<
+        Hash: Hasher,
+        Source: Iterator<Item = u8>,
+        const THRESHOLD: u32,
+        const MIN_SIZE: usize,
+        const MAX_SIZE: usize,
+    > FusedIterator for Distances<Hash, Source, THRESHOLD, MIN_SIZE, MAX_SIZE>
+where
+    Hash::Checksum: Leveled,
+    Hash::State: Clone,
+{
 }
 
 #[cfg(feature = "alloc")]
-#[doc(cfg(feature = "alloc"))]
 pub struct Spans<
     'a,
     Hash: Hasher,
@@ -310,7 +389,6 @@ pub struct Spans<
 }
 
 #[cfg(feature = "alloc")]
-#[doc(cfg(feature = "alloc"))]
 impl<'a, Hash: Hasher, const THRESHOLD: u32, const MIN_SIZE: usize, const MAX_SIZE: usize>
     Spans<'a, Hash, THRESHOLD, MIN_SIZE, MAX_SIZE>
 {
@@ -323,7 +401,6 @@ impl<'a, Hash: Hasher, const THRESHOLD: u32, const MIN_SIZE: usize, const MAX_SI
 }
 
 #[cfg(feature = "alloc")]
-#[doc(cfg(feature = "alloc"))]
 impl<'a, Hash: Hasher, const THRESHOLD: u32, const MIN_SIZE: usize, const MAX_SIZE: usize> Iterator
     for Spans<'a, Hash, THRESHOLD, MIN_SIZE, MAX_SIZE>
 where
@@ -334,10 +411,23 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         self.distances.next().map(|Extent { length, boundary }| {
-            let prev = self.saved;
-            self.saved = &prev[length.get()..];
+            let (front, back) = self.saved.split_at(length.get());
+            self.saved = back;
 
-            ResumableChunk::new(&prev[..length.get()], boundary.into_state())
+            ResumableChunk::new(front, boundary.into_state())
         })
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.distances.size_hint()
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<'a, Hash: Hasher, const THRESHOLD: u32, const MIN_SIZE: usize, const MAX_SIZE: usize>
+    FusedIterator for Spans<'a, Hash, THRESHOLD, MIN_SIZE, MAX_SIZE>
+where
+    Hash::Checksum: Leveled,
+    Hash::State: Clone,
+{
 }
